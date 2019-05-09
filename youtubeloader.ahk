@@ -49,7 +49,7 @@ Gui, Add, Checkbox, Checked x6 y46 vCheckThumbnails , +images
 Gui, Add, ComboBox, x70 y40 vVideoFormat AltSubmit ,Best||View variants|3gp 176x144|webm 640x360|mp4 640x360|mp4 hd720|webm audio 1|webm audio 2|m4a audio 3|webm audio 4|webm audio 5|webm 256x144|mp4 256x144|webm 1280x720|mp4 1280x720|webm 1920x1080|mp4 1920x1080
 Gui, Add, Button, x195 y40 w60 gGoFolder, Folder
 Gui, Add, Button, x265 y40 w60 gGoLoad, Dload
-Gui, Add, Button, x335 y40 w20 gVPath, ...
+Gui, Add, Button, x335 y40 w20 vSettingsButton gVPath, ...
 Gui, Add, Button, x365 y40 w20 gUpdateList, 🔃
 
 Gui, Add, ListView, x6 r25 w400 +Grid vTLV AltSubmit gResultTable, №  |File Size |Name
@@ -93,8 +93,13 @@ return
 
 VPath:
 ;videoPath := ""
+GuiControlGet, MyEdit , Pos, SettingsButton
+MsgBox The X coordinate is %MyEditX%. The Y coordinate is %MyEditY%. The width is %MyEditW%. The height is %MyEditH%.
 msgbox, %videoPath%
 FileSelectFolder, videoPath, %videoPath%, 3, Select folder for files
+if (videoPath = "")  {
+	return
+}
 DriveSpaceFree, driveSpaceFreeMB, %videoPath%
 SB_SetText("[" . driveSpaceFreeMB . "MB free] folder: " . videoPath)
 return
