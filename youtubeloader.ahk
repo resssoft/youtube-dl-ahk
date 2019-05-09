@@ -41,6 +41,8 @@ UpdateFileList()
   }
 }
 
+DriveSpaceFree, driveSpaceFreeMB, %videoPath%
+
 Gui, Add, Edit, x6 y5 w320 h20 vPath,
 Gui, Add, Button, x336 y5 w70 gFromClipBoard , Buffer
 Gui, Add, Checkbox, Checked x6 y46 vCheckThumbnails , +images
@@ -52,7 +54,7 @@ Gui, Add, Button, x365 y40 w20 gUpdateList, 🔃
 
 Gui, Add, ListView, x6 r25 w400 +Grid vTLV AltSubmit gResultTable, №  |File Size |Name
 Gui, Add, StatusBar,,
-SB_SetText("files folder: " . videoPath)
+SB_SetText("[" . driveSpaceFreeMB . "MB free] folder: " . videoPath)
 Gui, Font, s22 cFFFFFF Bold, Verdana ; If desired, use a line like this to set a new default font for the window.
 GuiControl, Font, TextArea
 Gui, Color, FFFFFF
@@ -67,6 +69,9 @@ Menu, Tray, Add , &Reload, Reload
 Gui, Show, w420 h550, Video dloader (youtube and etc) v 2.8
 UpdateFileList()
 Return
+
+; NEED
+; Short version - last DL file name and hotkey/button for DL
 
 ^+0::
 Gui, Show
@@ -90,7 +95,8 @@ VPath:
 ;videoPath := ""
 msgbox, %videoPath%
 FileSelectFolder, videoPath, %videoPath%, 3, Select folder for files
-SB_SetText("files folder: " . videoPath)
+DriveSpaceFree, driveSpaceFreeMB, %videoPath%
+SB_SetText("[" . driveSpaceFreeMB . "MB free] folder: " . videoPath)
 return
 
 GoLoad:
