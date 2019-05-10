@@ -3,6 +3,16 @@
 SetBatchLines, -1
 videoPath := A_ScriptDir
 ALLfiles := Object()
+shortWin := false
+downloadsDirName := "downloads"
+historyFileName := "history.txt"
+specialParams := ""
+
+video_provider := "youtube-dl.exe"
+video_providerLink := "https://ytdl-org.github.io/youtube-dl/download.html"
+video_providerNotice := "We cant find " . video_provider . " But it needle for programm work.`nDownload it from: " . video_providerLink
+
+Menu, Tray, Icon, %A_ScriptDir%\system\youtube_dl.ico,, 0
 
 NOTexistFile(currentVal)
 {
@@ -30,15 +40,37 @@ UpdateFileList()
 {
   Gui, ListView, TLV
   global ALLfiles
+  global shortWin
+  global videoPath
+  lastFileName := ""
   extensions := "mp4,mkv,mka,webm,weba,mp3,mpa,MP4,MKV,MKA,WEBM,WEBA,MP3,MPA"
   Loop * {
-    ;LV_Add("",A_Index,A_LoopFileSizeMB,A_LoopFileName)
     if A_LoopFileExt in %extensions%
-    if (NOTexistFile(A_LoopFileName)) {
-      addnewrow(A_LoopFileSizeMB . " MB", A_LoopFileName, "0x000000", "0xfdaabd")
+    {
+	    if (NOTexistFile(A_LoopFileName)) {
+	      addnewrow(A_LoopFileSizeMB . " MB", A_LoopFileName, "0x000000", "0xfdaabd")
+	    }
+	    ALLfiles.Insert(A_LoopFileName)
+	    lastFileName := A_LoopFileName
     }
-    ALLfiles.Insert(A_LoopFileName)
   }
+  UpdateStatusBar()
+  if (shortWin) {
+		DriveSpaceFree, driveSpaceFreeMB, %videoPath%
+		SB_SetText("Drive[" . driveSpaceFreeMB . "MB] " . lastFileName)
+  }
+}
+
+UpdateStatusBar()
+{
+	global videoPath
+	DriveSpaceFree, driveSpaceFreeMB, %videoPath%
+	SB_SetText("[" . driveSpaceFreeMB . "MB free] folder: " . videoPath)
+}
+
+GuiControlShowHide(controls,showhide="Hide"){
+	Loop,Parse,controls,|
+	GuiControl, %showhide%,%A_LoopField%
 }
 
 DriveSpaceFree, driveSpaceFreeMB, %videoPath%
@@ -49,41 +81,106 @@ Gui, Add, Checkbox, Checked x6 y46 vCheckThumbnails , +images
 Gui, Add, ComboBox, x70 y40 vVideoFormat AltSubmit ,Best||View variants|3gp 176x144|webm 640x360|mp4 640x360|mp4 hd720|webm audio 1|webm audio 2|m4a audio 3|webm audio 4|webm audio 5|webm 256x144|mp4 256x144|webm 1280x720|mp4 1280x720|webm 1920x1080|mp4 1920x1080
 Gui, Add, Button, x195 y40 w60 gGoFolder, Folder
 Gui, Add, Button, x265 y40 w60 gGoLoad, Dload
-Gui, Add, Button, x335 y40 w20 vSettingsButton gVPath, ...
-Gui, Add, Button, x365 y40 w20 gUpdateList, 🔃
-
+Gui, Add, Button, x335 y40 w60 vSettingsButton gSettings, Settings
 Gui, Add, ListView, x6 r25 w400 +Grid vTLV AltSubmit gResultTable, №  |File Size |Name
-Gui, Add, StatusBar,,
-SB_SetText("[" . driveSpaceFreeMB . "MB free] folder: " . videoPath)
+Gui, Add, StatusBar, vStatusBar,
 Gui, Font, s22 cFFFFFF Bold, Verdana ; If desired, use a line like this to set a new default font for the window.
 GuiControl, Font, TextArea
 Gui, Color, FFFFFF
+Gui +Resize
 
-; Create a popup menu to be used as the context menu:
-Menu, MyContextMenu, Add, Open, ContextOpenFile
-Menu, MyContextMenu, Add, Open, ContextMoveFileTo
-Menu, MyContextMenu, Default, Open  ; Make "Open" a bold font to indicate that double-click does the same thing.
+
+Menu, MoveToMenu, Add, Choice folder, FileMoveTo
+Menu, MoveToMenu, Icon, Choice folder, %A_ScriptDir%\system\folder_text.png,, 0
+
+Menu, MoveToMenu, Add, Create new dir, FileMoveNewDir
+Menu, MoveToMenu, Icon, Create new dir, %A_ScriptDir%\system\folder_add.png,, 0
+
+IfExist, %A_ScriptDir%\%downloadsDirName%
+{
+    Loop, %A_ScriptDir%\%downloadsDirName%\*.*, 2
+    {
+  		Menu, MoveToMenu, Add, %A_LoopFileName%, FileMoveTo
+  		Menu, MoveToMenu, Icon, %A_LoopFileName%, %A_ScriptDir%\system\folder.png,, 0
+    }
+} else {
+  FileCreateDir, %A_ScriptDir%\%downloadsDirName%
+}
+
+Menu, MyContextMenu, Add, Open file (or double-click in table), MenuOpen
+Menu, MyContextMenu, Icon, Open file (or double-click in table), %A_ScriptDir%\system\document.png,, 0
+
+Menu, MyContextMenu, Add, Move to, :MoveToMenu
+Menu, MyContextMenu, Icon, Move to, %A_ScriptDir%\system\move.png,, 0
+
+Menu, MyContextMenu, Add
+
+Menu, MyContextMenu, Add, Change path for files, VPath
+Menu, MyContextMenu, Icon, Change path for files, %A_ScriptDir%\system\smart_folder.png,, 0
+
+Menu, MyContextMenu, Add, Short-Full window trigger, ShortVersion
+Menu, MyContextMenu, Icon, Short-Full window trigger, %A_ScriptDir%\system\crop.png,, 0
+
+Menu, MyContextMenu, Add, Update list, UpdateList
+Menu, MyContextMenu, Icon, Update list, %A_ScriptDir%\system\refresh.png,, 0
+
+Menu, MyContextMenu, Add, Open files folder, GoFolder
+Menu, MyContextMenu, Icon, Open files folder, %A_ScriptDir%\system\opened_folder.png,, 0
+
+Menu, MyContextMenu, Add, history, OpenHistoryFile
+Menu, MyContextMenu, Icon, history, %A_ScriptDir%\system\list.png,, 0
+
+Menu, MyContextMenu, Add, set spec params, SetSpecialParams
+Menu, MyContextMenu, Icon, set spec params, %A_ScriptDir%\system\terminal.png,, 0
+
+Menu, MyContextMenu, Add, Reload, Reload
+Menu, MyContextMenu, Icon, Reload, %A_ScriptDir%\system\restart.png,, 0
+
+Menu, MyContextMenu, Add, About, About
+Menu, MyContextMenu, Icon, About, %A_ScriptDir%\system\info.png,, 0
 
 Menu, Tray, Add , &Reload, Reload
 
-Gui, Show, w420 h550, Video dloader (youtube and etc) v 2.8
+Gui, Show, w420 h550, Video dloader (youtube and etc) v 2.9
 UpdateFileList()
+
+IfNotExist, %A_ScriptDir%\%video_provider%
+{
+	msgbox, %video_providerNotice%
+}
+
 Return
 
 ; NEED
 ; Short version - last DL file name and hotkey/button for DL
+; ContextMoveFileTo and ContextOpenFile
 
 ^+0::
-Gui, Show
+	Gui, Show
 return
 
 Reload:
-Reload
+	Reload
+Return
+
+ShortVersion:
+Gui +LastFound
+if (shortWin) {
+	Gui, Show, w420 h550
+	GuiControlShowHide("TLV","show")
+
+	shortWin := false
+} else {
+	Gui, Show, w420 h88
+	GuiControlShowHide("TLV","hide")
+	shortWin := true
+}
 Return
 
 GoFolder:
 ; A_ScriptDir A_WorkingDir
-explorerpath:= "explorer /select," A_ScriptDir
+;explorerpath:= "explorer /select," A_ScriptDir
+explorerpath := videoPath
 Run, %explorerpath%
 return
 
@@ -91,20 +188,55 @@ UpdateList:
 UpdateFileList()
 return
 
+Settings:
+GuiControlGet, SettingsButtonPos , Pos, SettingsButton
+Menu, MyContextMenu, Show, %SettingsButtonPosX%, %SettingsButtonPosY%
+return
+
+SetSpecialParams:
+	InputBox, NewSpecialParams , Enter SpecialParams, , , , , , , , , %specialParams%
+	if (NewSpecialParams = "")  {
+		return
+	}
+	specialParams := NewSpecialParams
+return
+
+
+FileMoveNewDir:
+	InputBox, newDirName , Enter new dir name
+	if (newDirName = "")  {
+		return
+	}
+	FileCreateDir, %A_ScriptDir%\%downloadsDirName%\%newDirName%
+	Menu, MoveToMenu, Add, %newDirName%, FileMoveTo
+	Menu, MoveToMenu, Icon, %newDirName%, %A_ScriptDir%\system\opened_folder.png,, 0
+return
+
 VPath:
-;videoPath := ""
-GuiControlGet, MyEdit , Pos, SettingsButton
-MsgBox The X coordinate is %MyEditX%. The Y coordinate is %MyEditY%. The width is %MyEditW%. The height is %MyEditH%.
-msgbox, %videoPath%
-FileSelectFolder, videoPath, %videoPath%, 3, Select folder for files
-if (videoPath = "")  {
+FileSelectFolder, newVideoPath, %videoPath%, 3, Select folder for files
+if (newVideoPath = "")  {
 	return
 }
-DriveSpaceFree, driveSpaceFreeMB, %videoPath%
-SB_SetText("[" . driveSpaceFreeMB . "MB free] folder: " . videoPath)
+videoPath := newVideoPath
+UpdateStatusBar()
+return
+
+OpenHistoryFile:
+	IfNotExist, %A_ScriptDir%\%historyFileName%
+	{
+		msgbox, History is empty
+		return
+	} else {
+		Run %A_ScriptDir%\%historyFileName%
+	}
 return
 
 GoLoad:
+IfNotExist, %A_ScriptDir%\%video_provider%
+{
+	msgbox, %video_providerNotice%
+	return
+}
 Gui, Submit, NoHide
 params := ""
 lastparams := ""
@@ -165,7 +297,7 @@ if (InStr(Path,"http")) {
 	params := params " " quotes "http://www.youtube.com/watch?v=" Path quotes
 }
 
-fullPath := video_provider " " params
+fullPath := video_provider " " params " " specialParams
 
 RunWait %fullPath%
 
@@ -187,6 +319,52 @@ return
 
 ContextMoveFileTo:
 	MsgBox in develop
+return
+
+FileMoveTo:
+	Loop % LV_GetCount("S")
+	{
+		RowNumber := LV_GetNext(RowNumber)
+		if not RowNumber  ; The above returned zero, so there are no more selected rows.
+	        break
+	    LV_GetText(FileName, RowNumber, 3)
+	    FileMove, %A_ScriptDir%\%FileName%, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    if ErrorLevel
+	    {
+	        MsgBox Could not move "%A_ScriptDir%\%FileName%" to %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\
+	        Continue
+	    } else 
+	    {
+	    	LV_Delete(RowNumber)
+	    }
+
+		SplitPath, FileName , OutFileName, OutDir, OutExtension, OutNameNoExt
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%.jpg
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%.png
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	}
+Sleep, 1000
+UpdateFileList()
+return
+
+MenuOpen:
+Gui +LastFound
+RowNumber = 0
+Loop % LV_GetCount("S")
+{
+	RowNumber := LV_GetNext(RowNumber)
+	if not RowNumber  ; The above returned zero, so there are no more selected rows.
+        break
+    LV_GetText(FileName, RowNumber, 3)
+    Run %A_ScriptDir%\%FileName%,, UseErrorLevel
+    if ErrorLevel
+        MsgBox Could not open "%A_ScriptDir%\%FileName%".
+}
 return
 
 ResultTable:
@@ -217,6 +395,14 @@ Return
 FromClipBoard:
 GuiControl,, Path, %clipboard%
 Goto, GoLoad
+Return
+
+About:
+FileRead, readme, README.md
+msgbox, %readme%
+Return
+msgbox, Download files from yotube`
+		and others sites`nMore info: https://github.com/ytdl-org/youtube-dl/blob/master/README.md#readme
 Return
 
 
