@@ -7,12 +7,17 @@ shortWin := false
 downloadsDirName := "downloads"
 historyFileName := "history.txt"
 specialParams := ""
+version = "2.9"
+imagesFolder := "images"
 
 video_provider := "youtube-dl.exe"
 video_providerLink := "https://ytdl-org.github.io/youtube-dl/download.html"
 video_providerNotice := "We cant find " . video_provider . " But it needle for programm work.`nDownload it from: " . video_providerLink
+providerQuestionDownload := "Would you like to download it? (press Yes or No)"
+providerLinkForDownload := "http://46j.ru/files/youtube-dl.exe"
 
-Menu, Tray, Icon, %A_ScriptDir%\system\youtube_dl.ico,, 0
+
+Menu, Tray, Icon, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico,, 0
 
 NOTexistFile(currentVal)
 {
@@ -91,62 +96,68 @@ Gui +Resize
 
 
 Menu, MoveToMenu, Add, Choice folder, FileMoveTo
-Menu, MoveToMenu, Icon, Choice folder, %A_ScriptDir%\system\folder_text.png,, 0
+Menu, MoveToMenu, Icon, Choice folder, %A_ScriptDir%\%imagesFolder%\folder_text.png,, 0
 
 Menu, MoveToMenu, Add, Create new dir, FileMoveNewDir
-Menu, MoveToMenu, Icon, Create new dir, %A_ScriptDir%\system\folder_add.png,, 0
+Menu, MoveToMenu, Icon, Create new dir, %A_ScriptDir%\%imagesFolder%\folder_add.png,, 0
 
 IfExist, %A_ScriptDir%\%downloadsDirName%
 {
     Loop, %A_ScriptDir%\%downloadsDirName%\*.*, 2
     {
   		Menu, MoveToMenu, Add, %A_LoopFileName%, FileMoveTo
-  		Menu, MoveToMenu, Icon, %A_LoopFileName%, %A_ScriptDir%\system\folder.png,, 0
+  		Menu, MoveToMenu, Icon, %A_LoopFileName%, %A_ScriptDir%\%imagesFolder%\folder.png,, 0
     }
 } else {
   FileCreateDir, %A_ScriptDir%\%downloadsDirName%
 }
 
 Menu, MyContextMenu, Add, Open file (or double-click in table), MenuOpen
-Menu, MyContextMenu, Icon, Open file (or double-click in table), %A_ScriptDir%\system\document.png,, 0
+Menu, MyContextMenu, Icon, Open file (or double-click in table), %A_ScriptDir%\%imagesFolder%\document.png,, 0
 
 Menu, MyContextMenu, Add, Move to, :MoveToMenu
-Menu, MyContextMenu, Icon, Move to, %A_ScriptDir%\system\move.png,, 0
+Menu, MyContextMenu, Icon, Move to, %A_ScriptDir%\%imagesFolder%\move.png,, 0
 
 Menu, MyContextMenu, Add
 
 Menu, MyContextMenu, Add, Change path for files, VPath
-Menu, MyContextMenu, Icon, Change path for files, %A_ScriptDir%\system\smart_folder.png,, 0
+Menu, MyContextMenu, Icon, Change path for files, %A_ScriptDir%\%imagesFolder%\smart_folder.png,, 0
 
 Menu, MyContextMenu, Add, Short-Full window trigger, ShortVersion
-Menu, MyContextMenu, Icon, Short-Full window trigger, %A_ScriptDir%\system\crop.png,, 0
+Menu, MyContextMenu, Icon, Short-Full window trigger, %A_ScriptDir%\%imagesFolder%\crop.png,, 0
 
 Menu, MyContextMenu, Add, Update list, UpdateList
-Menu, MyContextMenu, Icon, Update list, %A_ScriptDir%\system\refresh.png,, 0
+Menu, MyContextMenu, Icon, Update list, %A_ScriptDir%\%imagesFolder%\refresh.png,, 0
 
 Menu, MyContextMenu, Add, Open files folder, GoFolder
-Menu, MyContextMenu, Icon, Open files folder, %A_ScriptDir%\system\opened_folder.png,, 0
+Menu, MyContextMenu, Icon, Open files folder, %A_ScriptDir%\%imagesFolder%\opened_folder.png,, 0
 
 Menu, MyContextMenu, Add, history, OpenHistoryFile
-Menu, MyContextMenu, Icon, history, %A_ScriptDir%\system\list.png,, 0
+Menu, MyContextMenu, Icon, history, %A_ScriptDir%\%imagesFolder%\list.png,, 0
 
 Menu, MyContextMenu, Add, set spec params, SetSpecialParams
-Menu, MyContextMenu, Icon, set spec params, %A_ScriptDir%\system\terminal.png,, 0
+Menu, MyContextMenu, Icon, set spec params, %A_ScriptDir%\%imagesFolder%\terminal.png,, 0
 
 Menu, MyContextMenu, Add, Reload, Reload
-Menu, MyContextMenu, Icon, Reload, %A_ScriptDir%\system\restart.png,, 0
+Menu, MyContextMenu, Icon, Reload, %A_ScriptDir%\%imagesFolder%\restart.png,, 0
 
 Menu, MyContextMenu, Add, About, About
-Menu, MyContextMenu, Icon, About, %A_ScriptDir%\system\info.png,, 0
+Menu, MyContextMenu, Icon, About, %A_ScriptDir%\%imagesFolder%\info.png,, 0
 
 Menu, Tray, Add , &Reload, Reload
 
-Gui, Show, w420 h550, Video dloader (youtube and etc) v 2.9
+Gui, Show, w420 h550, Video dloader (youtube and etc) v %version%
 UpdateFileList()
 
 IfNotExist, %A_ScriptDir%\%video_provider%
 {
-	msgbox, %video_providerNotice%
+	;msgbox, %video_providerNotice%
+	MsgBox, 36,, %video_providerNotice% `n
+	IfMsgBox Yes
+	{
+	    UrlDownloadToFile, %providerLinkForDownload%, %A_ScriptDir%\%video_provider%
+	    MsgBox done
+	}
 }
 
 Return
@@ -209,7 +220,7 @@ FileMoveNewDir:
 	}
 	FileCreateDir, %A_ScriptDir%\%downloadsDirName%\%newDirName%
 	Menu, MoveToMenu, Add, %newDirName%, FileMoveTo
-	Menu, MoveToMenu, Icon, %newDirName%, %A_ScriptDir%\system\opened_folder.png,, 0
+	Menu, MoveToMenu, Icon, %newDirName%, %A_ScriptDir%\%imagesFolder%\opened_folder.png,, 0
 return
 
 VPath:
