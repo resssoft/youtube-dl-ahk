@@ -1,23 +1,61 @@
 ﻿#SingleInstance, Force
 #NoEnv
+
 SetBatchLines, -1
-videoPath := A_ScriptDir
-ALLfiles := Object()
+version = "3.0.2"
+ontop := false
 shortWin := false
-downloadsDirName := "downloads"
+ALLfiles := Object()
+videoPath := A_ScriptDir
 historyFileName := "history.txt"
+
+settingsFileName := "settings.ini"
+settingsPath = %A_ScriptDir%\%settingsFileName%
+languagesDir := "languages"
+language := "en"
 specialParams := ""
-version = "2.9"
 imagesFolder := "images"
+downloadsDirName := "downloads"
 
 video_provider := "youtube-dl.exe"
-video_providerLink := "https://ytdl-org.github.io/youtube-dl/download.html"
-video_providerNotice := "We cant find " . video_provider . " But it needle for programm work.`nDownload it from: " . video_providerLink
-providerQuestionDownload := "Would you like to download it? (press Yes or No)"
 providerLinkForDownload := "http://46j.ru/files/youtube-dl.exe"
+video_providerLink := "https://ytdl-org.github.io/youtube-dl/download.html"
 
+;languages settings
+IfExist, %settingsPath%
+{
+	;IniRead, OutputVar, Filename [, Section, Key, Default]
+	IniRead, language, %settingsPath% , main, language, en
+	IniRead, specialParams, %settingsPath% , main, specialParams, #
+	if (specialParams = "#")
+		specialParams := ""
+} else 
+{
+	;IniWrite, Value, Filename, Section [, Key] 
+	IniWrite, %language%, %settingsPath%, main , language
+}
+IfNotExist, %A_ScriptDir%\%languagesDir%
+{
+  FileCreateDir, %A_ScriptDir%\%languagesDir%
+}
 
-Menu, Tray, Icon, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico,, 0
+doneMsg := getTranslatedString("doneMsg", "Done")
+historyEmpty := getTranslatedString("historyEmpty", "History is empty")
+
+video_providerNotice := "We cant find " . video_provider . " But it needle for programm work.`nDownload it from: " . video_providerLink
+providerQuestionDownload := getTranslatedString("providerQuestionDownload", "Would you like to download it? (press Yes or No)")
+
+getTranslatedString(valueName, defaultValue)
+{
+	global language
+	global languagesDir
+	IniRead, OutputVar, %A_ScriptDir%\%languagesDir%\%language%.ini , main, %valueName%, =
+	if (OutputVar = "=") {
+		IniWrite, %defaultValue%, %A_ScriptDir%\%languagesDir%\%language%.ini, main , %valueName%
+		return defaultValue
+	}
+	return OutputVar
+}
 
 NOTexistFile(currentVal)
 {
@@ -78,75 +116,90 @@ GuiControlShowHide(controls,showhide="Hide"){
 	GuiControl, %showhide%,%A_LoopField%
 }
 
+AddMenu(menuType, menuName, menuSub, menuIcon, isSeparator = 0)
+{
+	global imagesFolder
+	if (isSeparator = 1) {
+		Menu, %menuType%, Add
+		return
+	}
+	asd := menuType . RegExReplace(menuName,"\x20{1,}","_")
+	translatedName := getTranslatedString(menuType . RegExReplace(menuName,"\x20{1,}","_"), menuName)
+	Menu, %menuType%, Add, %translatedName%, %menuSub%
+	IfExist, %A_ScriptDir%\%imagesFolder%\%menuIcon%.png
+		Menu, %menuType%, Icon, %translatedName%, %A_ScriptDir%\%imagesFolder%\%menuIcon%.png,, 0
+	return
+}
+
+IfExist, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico
+	Menu, Tray, Icon, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico,, 0
+
+;GUI translates
 DriveSpaceFree, driveSpaceFreeMB, %videoPath%
+folderMsg := getTranslatedString("folderMsg", "Folder")
+showImagesMsg := getTranslatedString("showImagesMsg", "+images")
+BufferMsg := getTranslatedString("BufferMsg", "Buffer")
+DloadMsg := getTranslatedString("DloadMsg", "Download")
+SettingsMsg := getTranslatedString("SettingsMsg", "Settings")
+ListViewColFileSize := getTranslatedString("ListViewColFileSize", "File Size")
+ListViewColName := getTranslatedString("ListViewColName", "File Size")
+MainWinTitle := getTranslatedString("MainWinTitle", "Video dloader (youtube and etc)")
 
 Gui, Add, Edit, x6 y5 w320 h20 vPath,
-Gui, Add, Button, x336 y5 w70 gFromClipBoard , Buffer
-Gui, Add, Checkbox, Checked x6 y46 vCheckThumbnails , +images
+Gui, Add, Button, x336 y5 w70 gFromClipBoard , %BufferMsg%
+Gui, Add, Checkbox, Checked x6 y46 vCheckThumbnails , %showImagesMsg%
 Gui, Add, ComboBox, x70 y40 vVideoFormat AltSubmit ,Best||View variants|3gp 176x144|webm 640x360|mp4 640x360|mp4 hd720|webm audio 1|webm audio 2|m4a audio 3|webm audio 4|webm audio 5|webm 256x144|mp4 256x144|webm 1280x720|mp4 1280x720|webm 1920x1080|mp4 1920x1080
-Gui, Add, Button, x195 y40 w60 gGoFolder, Folder
-Gui, Add, Button, x265 y40 w60 gGoLoad, Dload
-Gui, Add, Button, x335 y40 w60 vSettingsButton gSettings, Settings
-Gui, Add, ListView, x6 r25 w400 +Grid vTLV AltSubmit gResultTable, №  |File Size |Name
+Gui, Add, Button, x195 y40 w60 gGoFolder, %folderMsg%
+Gui, Add, Button, x265 y40 w60 gGoLoad, %DloadMsg%
+Gui, Add, Button, x335 y40 w70 vSettingsButton gSettings, %SettingsMsg%
+Gui, Add, ListView, x6 r25 w400 +Grid vTLV AltSubmit gResultTable, №  |%ListViewColFileSize% |%ListViewColName%
 Gui, Add, StatusBar, vStatusBar,
 Gui, Font, s22 cFFFFFF Bold, Verdana ; If desired, use a line like this to set a new default font for the window.
 GuiControl, Font, TextArea
 Gui, Color, FFFFFF
 Gui +Resize
 
+;translate menu
 
-Menu, MoveToMenu, Add, Choice folder, FileMoveTo
-Menu, MoveToMenu, Icon, Choice folder, %A_ScriptDir%\%imagesFolder%\folder_text.png,, 0
-
-Menu, MoveToMenu, Add, Create new dir, FileMoveNewDir
-Menu, MoveToMenu, Icon, Create new dir, %A_ScriptDir%\%imagesFolder%\folder_add.png,, 0
-
+AddMenu("MoveToMenu", "Choice folder", "FileMoveTo", "folder_text")
+AddMenu("MoveToMenu", "Create new dir", "FileMoveNewDir", "folder_add")
 IfExist, %A_ScriptDir%\%downloadsDirName%
 {
     Loop, %A_ScriptDir%\%downloadsDirName%\*.*, 2
     {
-  		Menu, MoveToMenu, Add, %A_LoopFileName%, FileMoveTo
-  		Menu, MoveToMenu, Icon, %A_LoopFileName%, %A_ScriptDir%\%imagesFolder%\folder.png,, 0
+		AddMenu("MoveToMenu", A_LoopFileName, "FileMoveTo", "folder")
     }
 } else {
   FileCreateDir, %A_ScriptDir%\%downloadsDirName%
 }
 
-Menu, MyContextMenu, Add, Open file (or double-click in table), MenuOpen
-Menu, MyContextMenu, Icon, Open file (or double-click in table), %A_ScriptDir%\%imagesFolder%\document.png,, 0
+AddMenu("LanguageMenu", "Add new language", "AddLanguage", "language")
+IfExist, %A_ScriptDir%\%languagesDir%
+{
+    Loop, %A_ScriptDir%\%languagesDir%\*.ini
+    {
+    	SplitPath, A_LoopFileName , OutFileName, OutDir, OutExtension, OutNameNoExt
+		AddMenu("LanguageMenu", OutNameNoExt, "SetLanguageTo", "language")
+    }
+}
 
-Menu, MyContextMenu, Add, Move to, :MoveToMenu
-Menu, MyContextMenu, Icon, Move to, %A_ScriptDir%\%imagesFolder%\move.png,, 0
-
-Menu, MyContextMenu, Add
-
-Menu, MyContextMenu, Add, Change path for files, VPath
-Menu, MyContextMenu, Icon, Change path for files, %A_ScriptDir%\%imagesFolder%\smart_folder.png,, 0
-
-Menu, MyContextMenu, Add, Short-Full window trigger, ShortVersion
-Menu, MyContextMenu, Icon, Short-Full window trigger, %A_ScriptDir%\%imagesFolder%\crop.png,, 0
-
-Menu, MyContextMenu, Add, Update list, UpdateList
-Menu, MyContextMenu, Icon, Update list, %A_ScriptDir%\%imagesFolder%\refresh.png,, 0
-
-Menu, MyContextMenu, Add, Open files folder, GoFolder
-Menu, MyContextMenu, Icon, Open files folder, %A_ScriptDir%\%imagesFolder%\opened_folder.png,, 0
-
-Menu, MyContextMenu, Add, history, OpenHistoryFile
-Menu, MyContextMenu, Icon, history, %A_ScriptDir%\%imagesFolder%\list.png,, 0
-
-Menu, MyContextMenu, Add, set spec params, SetSpecialParams
-Menu, MyContextMenu, Icon, set spec params, %A_ScriptDir%\%imagesFolder%\terminal.png,, 0
-
-Menu, MyContextMenu, Add, Reload, Reload
-Menu, MyContextMenu, Icon, Reload, %A_ScriptDir%\%imagesFolder%\restart.png,, 0
-
-Menu, MyContextMenu, Add, About, About
-Menu, MyContextMenu, Icon, About, %A_ScriptDir%\%imagesFolder%\info.png,, 0
+AddMenu("MyContextMenu", "Open file (or double-click in table)", "MenuOpen", "document")
+AddMenu("MyContextMenu", "Move to", ":MoveToMenu", "move")
+AddMenu("MyContextMenu", "", "", "", 1)
+AddMenu("MyContextMenu", "Set language to", ":LanguageMenu", "language")
+AddMenu("MyContextMenu", "Change path for files", "VPath", "smart_folder")
+AddMenu("MyContextMenu", "Short-Full window trigger", "ShortVersion", "crop")
+AddMenu("MyContextMenu", "Update list", "UpdateList", "refresh")
+AddMenu("MyContextMenu", "Open files folder", "GoFolder", "opened_folder")
+AddMenu("MyContextMenu", "history", "OpenHistoryFile", "list")
+AddMenu("MyContextMenu", "Set spec params", "SetSpecialParams", "terminal")
+AddMenu("MyContextMenu", "on top on-off", "SetOnTop", "terminal")
+AddMenu("MyContextMenu", "Reload", "Reload", "restart")
+AddMenu("MyContextMenu", "About", "About", "info")
 
 Menu, Tray, Add , &Reload, Reload
 
-Gui, Show, w420 h550, Video dloader (youtube and etc) v %version%
+Gui, Show, w420 h550, %MainWinTitle% v%version%
 UpdateFileList()
 
 IfNotExist, %A_ScriptDir%\%video_provider%
@@ -156,7 +209,7 @@ IfNotExist, %A_ScriptDir%\%video_provider%
 	IfMsgBox Yes
 	{
 	    UrlDownloadToFile, %providerLinkForDownload%, %A_ScriptDir%\%video_provider%
-	    MsgBox done
+	    MsgBox %doneMsg%
 	}
 }
 
@@ -188,6 +241,17 @@ if (shortWin) {
 }
 Return
 
+SetOnTop:
+	Gui +LastFound
+	if (ontop) {
+		Gui, -AlwaysOnTop
+		ontop := false
+	} else {
+		Gui, +AlwaysOnTop
+		ontop := true
+	}
+Return
+
 GoFolder:
 ; A_ScriptDir A_WorkingDir
 ;explorerpath:= "explorer /select," A_ScriptDir
@@ -210,6 +274,7 @@ SetSpecialParams:
 		return
 	}
 	specialParams := NewSpecialParams
+	IniWrite, %specialParams%, %settingsPath%, main , specialParams
 return
 
 
@@ -235,7 +300,7 @@ return
 OpenHistoryFile:
 	IfNotExist, %A_ScriptDir%\%historyFileName%
 	{
-		msgbox, History is empty
+		msgbox, %historyEmpty%
 		return
 	} else {
 		Run %A_ScriptDir%\%historyFileName%
@@ -315,7 +380,7 @@ RunWait %fullPath%
 if (VideoFormat = 2) {
 	FileRead, Contents, formats.txt
 	if not ErrorLevel {
-		msgbox, Contents
+		msgbox, %Contents%
 	}
 }
 UpdateFileList()
@@ -330,6 +395,14 @@ return
 
 ContextMoveFileTo:
 	MsgBox in develop
+return
+
+SetLanguageTo:
+	IniWrite, %A_ThisMenuItem%, %settingsPath%, main , language
+	Reload
+return
+
+AddLanguage:
 return
 
 FileMoveTo:
@@ -359,54 +432,61 @@ FileMoveTo:
 	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
 	    }
 	}
-Sleep, 1000
-UpdateFileList()
+	Sleep, 1000
+	UpdateFileList()
 return
 
 MenuOpen:
-Gui +LastFound
-RowNumber = 0
-Loop % LV_GetCount("S")
-{
-	RowNumber := LV_GetNext(RowNumber)
-	if not RowNumber  ; The above returned zero, so there are no more selected rows.
-        break
-    LV_GetText(FileName, RowNumber, 3)
-    Run %A_ScriptDir%\%FileName%,, UseErrorLevel
-    if ErrorLevel
-        MsgBox Could not open "%A_ScriptDir%\%FileName%".
-}
+	Gui +LastFound
+	RowNumber = 0
+	Loop % LV_GetCount("S")
+	{
+		RowNumber := LV_GetNext(RowNumber)
+		if not RowNumber  ; The above returned zero, so there are no more selected rows.
+	        break
+	    LV_GetText(FileName, RowNumber, 3)
+	    Run %A_ScriptDir%\%FileName%,, UseErrorLevel
+	    if ErrorLevel
+	        MsgBox Could not open "%A_ScriptDir%\%FileName%".
+	}
 return
 
 ResultTable:
-if (A_GuiEvent = "DoubleClick")
-{
-    ;LV_GetText(RowText, A_EventInfo)  ; Get the text from the row's first field.
-    ;ToolTip You double-clicked row number %A_EventInfo%. Text: "%RowText%"
-    LV_GetText(FileName, A_EventInfo, 3)  ; Get the text of the second field.
-    Run %A_ScriptDir%\%FileName%,, UseErrorLevel
-    if ErrorLevel
-        MsgBox Could not open "%A_ScriptDir%\%FileName%".
-}
-if (A_GuiEvent = "RightClick")
-{
-	MouseGetPos, xpos, ypos 
-    Menu, MyContextMenu, Show, %xpos%, %ypos%
-}
+	if (A_GuiEvent = "DoubleClick")
+	{
+	    ;LV_GetText(RowText, A_EventInfo)  ; Get the text from the row's first field.
+	    ;ToolTip You double-clicked row number %A_EventInfo%. Text: "%RowText%"
+	    LV_GetText(FileName, A_EventInfo, 3)  ; Get the text of the second field.
+	    Run %A_ScriptDir%\%FileName%,, UseErrorLevel
+	    if ErrorLevel
+	        MsgBox Could not open "%A_ScriptDir%\%FileName%".
+	}
+	if (A_GuiEvent = "RightClick")
+	{
+		MouseGetPos, xpos, ypos 
+	    Menu, MyContextMenu, Show, %xpos%, %ypos%
+	}
 Return
 
 GuiClose:
-Gui, Hide
+	Gui, Hide
 return
 
 GuiDropFiles:
-GuiControl,, Path, %a_guievent%
+	GuiControl,, Path, %a_guievent%
 Return
 
 FromClipBoard:
-GuiControl,, Path, %clipboard%
-Goto, GoLoad
+	GuiControl,, Path, %clipboard%
+	Goto, GoLoad
 Return
+
+^+!0::
+	Gui, Show
+	Sleep, 400
+	GuiControl,, Path, %clipboard%
+	Goto, GoLoad
+return
 
 About:
 FileRead, readme, README.md

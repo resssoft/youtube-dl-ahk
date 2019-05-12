@@ -14,5 +14,9 @@ https://github.com/ytdl-org/youtube-dl
 - custom params
 - open multy files
 - about info
+- translations
+- config file (save lang and custom param)
+- on Top option
 
 Show hidden window by CTRL+SHIFT+0
+Quick download from buffer CTRL+SHIFT+ALT+0

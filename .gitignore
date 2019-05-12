@@ -12,5 +12,7 @@
 *.out
 .idea/*
 
+settings.ini
 history.txt
 downloads/*
+languages/*
