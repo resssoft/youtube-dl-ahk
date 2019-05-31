@@ -1,8 +1,10 @@
-﻿#SingleInstance, Force
+#SingleInstance, Force
 #NoEnv
 
+#Include, AutoXYWH.ahk
+
 SetBatchLines, -1
-version = "3.0.2"
+version = "3.0.31"
 ontop := false
 shortWin := false
 ALLfiles := Object()
@@ -146,11 +148,11 @@ ListViewColName := getTranslatedString("ListViewColName", "File Size")
 MainWinTitle := getTranslatedString("MainWinTitle", "Video dloader (youtube and etc)")
 
 Gui, Add, Edit, x6 y5 w320 h20 vPath,
-Gui, Add, Button, x336 y5 w70 gFromClipBoard , %BufferMsg%
+Gui, Add, Button, x336 y5 w70 gFromClipBoard vFromClipBoard, %BufferMsg%
 Gui, Add, Checkbox, Checked x6 y46 vCheckThumbnails , %showImagesMsg%
 Gui, Add, ComboBox, x70 y40 vVideoFormat AltSubmit ,Best||View variants|3gp 176x144|webm 640x360|mp4 640x360|mp4 hd720|webm audio 1|webm audio 2|m4a audio 3|webm audio 4|webm audio 5|webm 256x144|mp4 256x144|webm 1280x720|mp4 1280x720|webm 1920x1080|mp4 1920x1080
-Gui, Add, Button, x195 y40 w60 gGoFolder, %folderMsg%
-Gui, Add, Button, x265 y40 w60 gGoLoad, %DloadMsg%
+Gui, Add, Button, x195 y40 w60 gGoFolder vGoFolder, %folderMsg%
+Gui, Add, Button, x265 y40 w60 gGoLoad vGoLoad, %DloadMsg%
 Gui, Add, Button, x335 y40 w70 vSettingsButton gSettings, %SettingsMsg%
 Gui, Add, ListView, x6 r25 w400 +Grid vTLV AltSubmit gResultTable, №  |%ListViewColFileSize% |%ListViewColName%
 Gui, Add, StatusBar, vStatusBar,
@@ -159,7 +161,7 @@ GuiControl, Font, TextArea
 Gui, Color, FFFFFF
 Gui +Resize
 
-;translate menu
+;translate menu 
 
 AddMenu("MoveToMenu", "Choice folder", "FileMoveTo", "folder_text")
 AddMenu("MoveToMenu", "Create new dir", "FileMoveNewDir", "folder_add")
@@ -221,6 +223,19 @@ Return
 
 ^+0::
 	Gui, Show
+return
+
+GuiSize:
+	If (A_EventInfo = 1) ; The window has been minimized.
+		Return
+	AutoXYWH("wh", "TLV")
+	AutoXYWH("w", "Path")
+	AutoXYWH("w", "VideoFormat")
+
+	AutoXYWH("x", "FromClipBoard")
+	AutoXYWH("x", "GoFolder")
+	AutoXYWH("x", "GoLoad")
+	AutoXYWH("x", "SettingsButton")
 return
 
 Reload:
@@ -406,6 +421,7 @@ AddLanguage:
 return
 
 FileMoveTo:
+	Array := Object()
 	Loop % LV_GetCount("S")
 	{
 		RowNumber := LV_GetNext(RowNumber)
@@ -422,17 +438,18 @@ FileMoveTo:
 	    	LV_Delete(RowNumber)
 	    }
 
+	    Array.Insert(FileName)
 		SplitPath, FileName , OutFileName, OutDir, OutExtension, OutNameNoExt
+
 	    IfExist, %A_ScriptDir%\%OutNameNoExt%.jpg
 	    {
-	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    	;FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
 	    }
 	    IfExist, %A_ScriptDir%\%OutNameNoExt%.png
 	    {
-	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    	;FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
 	    }
 	}
-	Sleep, 1000
 	UpdateFileList()
 return
 
