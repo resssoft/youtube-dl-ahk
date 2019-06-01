@@ -4,7 +4,7 @@
 #Include, AutoXYWH.ahk
 
 SetBatchLines, -1
-version = "3.0.31"
+version = "3.0.32"
 ontop := false
 shortWin := false
 ALLfiles := Object()
@@ -44,6 +44,9 @@ IfNotExist, %A_ScriptDir%\%languagesDir%
 doneMsg := getTranslatedString("doneMsg", "Done")
 historyEmpty := getTranslatedString("historyEmpty", "History is empty")
 
+MessageMoved := getTranslatedString("Moved", "Moved")
+MessageFilesAfterCount := getTranslatedString("Files", "Files")
+
 video_providerNotice := "We cant find " . video_provider . " But it needle for programm work.`nDownload it from: " . video_providerLink
 providerQuestionDownload := getTranslatedString("providerQuestionDownload", "Would you like to download it? (press Yes or No)")
 
@@ -81,12 +84,16 @@ addnewrow(textvar2,textvar3,textcolor:="0x000000",bgcolor="0xFFFFFF")
 	LV_ModifyCol("Hdr")
 }
 
-UpdateFileList()
+UpdateFileList(withClear=0)
 {
   Gui, ListView, TLV
   global ALLfiles
   global shortWin
   global videoPath
+  if (withClear=1) {
+        ALLfiles:=[]
+        LV_Delete()
+  }
   lastFileName := ""
   extensions := "mp4,mkv,mka,webm,weba,mp3,mpa,MP4,MKV,MKA,WEBM,WEBA,MP3,MPA"
   Loop * {
@@ -275,7 +282,7 @@ Run, %explorerpath%
 return
 
 UpdateList:
-UpdateFileList()
+UpdateFileList(1)
 return
 
 Settings:
@@ -421,36 +428,55 @@ AddLanguage:
 return
 
 FileMoveTo:
-	Array := Object()
-	Loop % LV_GetCount("S")
+    Gui +LastFound
+	filesForMove := Object()
+	RowNumber := 0
+	Loop % LV_GetCount("Selected")
 	{
 		RowNumber := LV_GetNext(RowNumber)
 		if not RowNumber  ; The above returned zero, so there are no more selected rows.
 	        break
 	    LV_GetText(FileName, RowNumber, 3)
-	    FileMove, %A_ScriptDir%\%FileName%, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
-	    if ErrorLevel
-	    {
-	        MsgBox Could not move "%A_ScriptDir%\%FileName%" to %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\
-	        Continue
-	    } else 
-	    {
-	    	LV_Delete(RowNumber)
-	    }
+	    filesForMove.Insert(FileName)
+	}
 
-	    Array.Insert(FileName)
-		SplitPath, FileName , OutFileName, OutDir, OutExtension, OutNameNoExt
+	filesMovedCount := 0
+	for filesMovedIndex, filesMovedItem in filesForMove
+	{
+	    FileMove, %A_ScriptDir%\%filesMovedItem%, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+        if ErrorLevel
+        {
+            MsgBox Could not move "%A_ScriptDir%\%filesMovedItem%" to %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ `n %A_LastError%
+            Continue
+        }
+		SplitPath, filesMovedItem , OutFileName, OutDir, OutExtension, OutNameNoExt
 
 	    IfExist, %A_ScriptDir%\%OutNameNoExt%.jpg
 	    {
-	    	;FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
 	    }
 	    IfExist, %A_ScriptDir%\%OutNameNoExt%.png
 	    {
-	    	;FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%.description
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.description, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    filesMovedCount += 1
+
+	    for fileListIndex, fileListItem in ALLfiles
+	    {
+	        if (fileListItem = filesMovedItem)
+	        {
+	            ALLfiles.remove(fileListIndex)
+	            break
+	        }
 	    }
 	}
-	UpdateFileList()
+    ;filesForMoveCount := filesForMove.MaxIndex()
+    MsgBox %MessageMoved% %filesMovedCount% %MessageFilesAfterCount%
+	UpdateFileList(1)
 return
 
 MenuOpen:
