@@ -4,12 +4,13 @@
 #Include, AutoXYWH.ahk
 
 SetBatchLines, -1
-version = "3.0.32"
+version = "3.0.33"
 ontop := false
 shortWin := false
 ALLfiles := Object()
 videoPath := A_ScriptDir
 historyFileName := "history.txt"
+SplashImage := ""
 
 settingsFileName := "settings.ini"
 settingsPath = %A_ScriptDir%\%settingsFileName%
@@ -106,6 +107,7 @@ UpdateFileList(withClear=0)
 	    lastFileName := A_LoopFileName
     }
   }
+  LV_ModifyCol()
   UpdateStatusBar()
   if (shortWin) {
 		DriveSpaceFree, driveSpaceFreeMB, %videoPath%
@@ -132,12 +134,35 @@ AddMenu(menuType, menuName, menuSub, menuIcon, isSeparator = 0)
 		Menu, %menuType%, Add
 		return
 	}
-	asd := menuType . RegExReplace(menuName,"\x20{1,}","_")
 	translatedName := getTranslatedString(menuType . RegExReplace(menuName,"\x20{1,}","_"), menuName)
 	Menu, %menuType%, Add, %translatedName%, %menuSub%
 	IfExist, %A_ScriptDir%\%imagesFolder%\%menuIcon%.png
 		Menu, %menuType%, Icon, %translatedName%, %A_ScriptDir%\%imagesFolder%\%menuIcon%.png,, 0
 	return
+}
+
+SplashImageGUI(Picture, X, Y, Duration, Transparent = false, width = 100)
+{
+    Gui, XPT99:Margin , 0, 0
+    Gui, XPT99:Add, Picture, w%width% h-1, %Picture%
+    Gui, XPT99:Color, ECE9D8
+    Gui, XPT99:+LastFound -Caption +AlwaysOnTop +ToolWindow -Border
+    If Transparent
+    {
+    Winset, TransColor, ECE9D8
+    }
+    Gui, XPT99:Show, x%X% y%Y% NoActivate
+    SetTimer, DestroySplashGUI, -%Duration%
+    return
+
+    DestroySplashGUI:
+    Gui, XPT99:Destroy
+    return
+}
+
+SplashImageGUIDestroy()
+{
+    Gui, XPT99:Destroy
 }
 
 IfExist, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico
@@ -509,6 +534,25 @@ ResultTable:
 		MouseGetPos, xpos, ypos 
 	    Menu, MyContextMenu, Show, %xpos%, %ypos%
 	}
+	if (A_GuiEvent = "Normal")
+    {
+         image := ""
+         LV_GetText(FileName, A_EventInfo, 3)
+         SplitPath, FileName , OutFileName, OutDir, OutExtension, OutNameNoExt
+	     IfExist, %A_ScriptDir%\%OutNameNoExt%.jpg
+	     {
+	    	image=%A_ScriptDir%\%OutNameNoExt%.jpg
+	     }
+	     IfExist, %A_ScriptDir%\%OutNameNoExt%.png
+	     {
+	     	image=%A_ScriptDir%\%OutNameNoExt%.jpg
+	     }
+         if (image != "") {
+             SplashImageGUIDestroy()
+             SplashImageGUI(image, "Center", "Center", 2000, true)
+         }
+         image := ""
+    }
 Return
 
 GuiClose:
