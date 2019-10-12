@@ -4,7 +4,7 @@
 #Include, AutoXYWH.ahk
 
 SetBatchLines, -1
-version = "3.0.33"
+version = "3.0.36"
 ontop := false
 shortWin := false
 ALLfiles := Object()
@@ -96,7 +96,7 @@ UpdateFileList(withClear=0)
         LV_Delete()
   }
   lastFileName := ""
-  extensions := "mp4,mkv,mka,webm,weba,mp3,mpa,MP4,MKV,MKA,WEBM,WEBA,MP3,MPA"
+  extensions := "mp4,mkv,mka,webm,weba,mp3,mpa,m4a,MP4,MKV,MKA,WEBM,WEBA,MP3,MPA,M4A"
   Loop * {
     if A_LoopFileExt in %extensions%
     {
@@ -141,7 +141,7 @@ AddMenu(menuType, menuName, menuSub, menuIcon, isSeparator = 0)
 	return
 }
 
-SplashImageGUI(Picture, X, Y, Duration, Transparent = false, width = 100)
+SplashImageGUI(Picture, X, Y, Duration, Transparent = false, width = 500)
 {
     Gui, XPT99:Margin , 0, 0
     Gui, XPT99:Add, Picture, w%width% h-1, %Picture%
@@ -220,16 +220,19 @@ IfExist, %A_ScriptDir%\%languagesDir%
 AddMenu("MyContextMenu", "Open file (or double-click in table)", "MenuOpen", "document")
 AddMenu("MyContextMenu", "Move to", ":MoveToMenu", "move")
 AddMenu("MyContextMenu", "", "", "", 1)
-AddMenu("MyContextMenu", "Set language to", ":LanguageMenu", "language")
 AddMenu("MyContextMenu", "Change path for files", "VPath", "smart_folder")
 AddMenu("MyContextMenu", "Short-Full window trigger", "ShortVersion", "crop")
 AddMenu("MyContextMenu", "Update list", "UpdateList", "refresh")
 AddMenu("MyContextMenu", "Open files folder", "GoFolder", "opened_folder")
-AddMenu("MyContextMenu", "history", "OpenHistoryFile", "list")
-AddMenu("MyContextMenu", "Set spec params", "SetSpecialParams", "terminal")
 AddMenu("MyContextMenu", "on top on-off", "SetOnTop", "terminal")
-AddMenu("MyContextMenu", "Reload", "Reload", "restart")
-AddMenu("MyContextMenu", "About", "About", "info")
+
+AddMenu("SystemMenu", "Set language to", ":LanguageMenu", "language")
+AddMenu("SystemMenu", "Set spec params", "SetSpecialParams", "terminal")
+AddMenu("SystemMenu", "history", "OpenHistoryFile", "list")
+AddMenu("SystemMenu", "About", "About", "info")
+AddMenu("SystemMenu", "Update downloader", "UpdateDownloader", "info")
+AddMenu("SystemMenu", "Reload", "Reload", "restart")
+AddMenu("MyContextMenu", "System", ":SystemMenu", "terminal")
 
 Menu, Tray, Add , &Reload, Reload
 
@@ -270,6 +273,8 @@ GuiSize:
 	AutoXYWH("x", "SettingsButton")
 return
 
+
+^+R::
 Reload:
 	Reload
 Return
@@ -286,6 +291,11 @@ if (shortWin) {
 	GuiControlShowHide("TLV","hide")
 	shortWin := true
 }
+Return
+
+UpdateDownloader:
+	updatePath := video_provider " -U"
+	Run %updatePath%
 Return
 
 SetOnTop:
@@ -363,7 +373,6 @@ IfNotExist, %A_ScriptDir%\%video_provider%
 Gui, Submit, NoHide
 params := ""
 lastparams := ""
-video_provider := "youtube-dl.exe"
 nodownload := 0
 if (CheckGetQualityList = 1) {
 	params := %params% . " -F"
@@ -480,9 +489,36 @@ FileMoveTo:
 	    {
 	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
 	    }
+
+
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%_640.jpg
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%_640.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%_960.jpg
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%_960.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%_1280.jpg
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%_1280.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%_base.jpg
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%_base.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%_medium.jpg
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%_medium.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+	    IfExist, %A_ScriptDir%\%OutNameNoExt%_small.jpg
+	    {
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%_small.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    }
+
 	    IfExist, %A_ScriptDir%\%OutNameNoExt%.png
 	    {
-	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.png, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
 	    }
 	    IfExist, %A_ScriptDir%\%OutNameNoExt%.description
 	    {
@@ -545,11 +581,19 @@ ResultTable:
 	     }
 	     IfExist, %A_ScriptDir%\%OutNameNoExt%.png
 	     {
-	     	image=%A_ScriptDir%\%OutNameNoExt%.jpg
+	     	image=%A_ScriptDir%\%OutNameNoExt%.png
+	     }
+	     IfExist, %A_ScriptDir%\%OutNameNoExt%_640.jpg
+	     {
+	     	image=%A_ScriptDir%\%OutNameNoExt%_640.jpg
+	     }
+	     IfExist, %A_ScriptDir%\%OutNameNoExt%_medium.jpg
+	     {
+	     	image=%A_ScriptDir%\%OutNameNoExt%_medium.jpg
 	     }
          if (image != "") {
              SplashImageGUIDestroy()
-             SplashImageGUI(image, "Center", "Center", 2000, true)
+             SplashImageGUI(image, "Center", "Center", 1500, true)
          }
          image := ""
     }
@@ -602,11 +646,18 @@ Return
 ;--write-annotations
 
 ; =============== Features
-; Update!
+; Update downloader - Done
 ; templates
-;--config-location A_ScriptDir
-
+; --config-location A_ScriptDir
+; history in the table
+; check before load by history (option)
+; queue for myltyloads
+; custom converts
+; custom file work with some apps
 ; =============== Changes
 ; v 2.5 check links and dload from other sites (not only youtube)
 ; v 2.7 = add reload to tray and add to list *.mp4, *.mkv, *.mka, *.webm, *.weba, *.mp3
 ; v 2.8 Remove color rows (func LV_ColorChange) - it is not work
+; v 3.0.34 move menu in "system submenu", add update douwloader func
+; v 3.0.35 add formates (m4a), add image templates for move, some fix
+; v 3.0.36 ctrl+shift+R hot key for reload
