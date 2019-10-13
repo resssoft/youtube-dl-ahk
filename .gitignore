@@ -9,6 +9,7 @@
 *.webm
 *.description
 *.jpg
+*Temp.ini
 
 # Test binary, build with `go test -c`
 *.test
@@ -19,5 +20,6 @@
 
 settings.ini
 history.txt
+historyURL.txt
 downloads/*
 languages/*

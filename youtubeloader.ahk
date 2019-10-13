@@ -4,9 +4,10 @@
 #Include, AutoXYWH.ahk
 
 SetBatchLines, -1
-version = "3.0.36"
+version = "3.1.01"
 ontop := false
 shortWin := false
+listMode := 0
 ALLfiles := Object()
 videoPath := A_ScriptDir
 historyFileName := "history.txt"
@@ -42,6 +43,7 @@ IfNotExist, %A_ScriptDir%\%languagesDir%
   FileCreateDir, %A_ScriptDir%\%languagesDir%
 }
 
+disableInTheScheduleMode := getTranslatedString("disableInTheScheduleMode", "disable In The Schedule Mode")
 doneMsg := getTranslatedString("doneMsg", "Done")
 historyEmpty := getTranslatedString("historyEmpty", "History is empty")
 
@@ -119,7 +121,11 @@ UpdateStatusBar()
 {
 	global videoPath
 	DriveSpaceFree, driveSpaceFreeMB, %videoPath%
-	SB_SetText("[" . driveSpaceFreeMB . "MB free] folder: " . videoPath)
+	sbText := "[" . driveSpaceFreeMB . "MB free] folder: " . videoPath
+	if (listMode = 1) {
+	    sbText := "[S] " . sbText
+	}
+	SB_SetText(sbText)
 }
 
 GuiControlShowHide(controls,showhide="Hide"){
@@ -165,6 +171,92 @@ SplashImageGUIDestroy()
     Gui, XPT99:Destroy
 }
 
+flagInvert(flag)
+{
+    if (flag = 1)
+    {
+        flag = 0
+    } else {
+        flag = 1
+    }
+    return flag
+}
+
+SaveToIni(iniName)
+{
+    Gui +LastFound
+    rowNumber := 0
+    columnCount := LV_GetCount("Column")
+    rowCount := LV_GetCount()
+    Loop %rowCount%
+    {
+        rowNumber := A_Index
+        Loop %columnCount%
+        {
+            columnNumber := A_Index
+            LV_GetText(itemValue, rowNumber, columnNumber)
+            IniWrite, %itemValue%, %A_ScriptDir%\%iniName%, row-%rowNumber%, col-%columnNumber%
+        }
+    }
+}
+
+LoadFromIni(iniName, rowCount = 0)
+{
+    Gui +LastFound
+    columnCount := LV_GetCount("Column")
+    rowCount := LV_GetCount()
+    LV_Delete()
+    rowCountClear := LV_GetCount()
+    IfNotExist, %A_ScriptDir%\%iniName%
+        return
+    Loop
+    {
+        rowNumber := A_Index
+        IniRead, itemValue, %A_ScriptDir%\%iniName%, row-%rowNumber%, col-1
+        itemLength := StrLen(itemValue)
+        if (itemLength = 0 OR itemValue = "ERROR") {
+            break
+        }
+        LV_Add("icon1", "")
+        Loop
+        {
+            columnNumber := A_Index
+            LV_GetText(itemValue, rowNumber, columnNumber)
+            IniRead, itemValue, %A_ScriptDir%\%iniName%, row-%rowNumber%, col-%columnNumber%
+            itemLength := StrLen(itemValue)
+            if (itemLength = 0 OR itemValue = "ERROR") {
+                break
+            }
+            LV_Modify(rowNumber, "col" . columnNumber, itemValue)
+        }
+    }
+}
+
+ScheduleMode() {
+    Gui +LastFound
+    global listMode
+    global ScheduleMsg
+    global BufferMsg
+    global StartMsg
+    global folderMsg
+    listMode := flagInvert(listMode)
+    if (listMode = 1) {
+        GuiControl ,, FromClipBoard, %ScheduleMsg%
+        GuiControl ,, GoFolder, %StartMsg%
+
+        SaveToIni("filenamesTemp.ini")
+        LoadFromIni("ScheduledTemp.ini")
+    } else {
+        GuiControl ,, FromClipBoard, %BufferMsg%
+        GuiControl ,, GoFolder, %folderMsg%
+        SaveToIni("ScheduledTemp.ini")
+        LoadFromIni("filenamesTemp.ini")
+        FileDelete, %A_ScriptDir%\filenamesTemp.ini
+    }
+    UpdateStatusBar()
+}
+
+
 IfExist, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico
 	Menu, Tray, Icon, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico,, 0
 
@@ -173,6 +265,8 @@ DriveSpaceFree, driveSpaceFreeMB, %videoPath%
 folderMsg := getTranslatedString("folderMsg", "Folder")
 showImagesMsg := getTranslatedString("showImagesMsg", "+images")
 BufferMsg := getTranslatedString("BufferMsg", "Buffer")
+ScheduleMsg := getTranslatedString("ScheduleMsg", "Schedule")
+StartMsg := getTranslatedString("StartMsg", "Start")
 DloadMsg := getTranslatedString("DloadMsg", "Download")
 SettingsMsg := getTranslatedString("SettingsMsg", "Settings")
 ListViewColFileSize := getTranslatedString("ListViewColFileSize", "File Size")
@@ -225,6 +319,7 @@ AddMenu("MyContextMenu", "Short-Full window trigger", "ShortVersion", "crop")
 AddMenu("MyContextMenu", "Update list", "UpdateList", "refresh")
 AddMenu("MyContextMenu", "Open files folder", "GoFolder", "opened_folder")
 AddMenu("MyContextMenu", "on top on-off", "SetOnTop", "terminal")
+AddMenu("MyContextMenu", "Schedule mode On", "Schedule", "terminal")
 
 AddMenu("SystemMenu", "Set language to", ":LanguageMenu", "language")
 AddMenu("SystemMenu", "Set spec params", "SetSpecialParams", "terminal")
@@ -254,8 +349,8 @@ Return
 
 ; NEED
 ; Short version - last DL file name and hotkey/button for DL
-; ContextMoveFileTo and ContextOpenFile
 
+;CTRL+SHIFT+0
 ^+0::
 	Gui, Show
 return
@@ -274,10 +369,24 @@ GuiSize:
 return
 
 
+;CTRL+SHIFT+R
 ^+R::
 Reload:
 	Reload
 Return
+
+;CTRL+SHIFT+9
+^+9::
+Schedule:
+    ScheduleMode()
+return
+
+;CTRL+SHIFT+ALT+0
+^+!0::
+	Gui, Show
+	Sleep, 400
+	Goto, FromClipBoard
+return
 
 ShortVersion:
 Gui +LastFound
@@ -310,14 +419,22 @@ SetOnTop:
 Return
 
 GoFolder:
-; A_ScriptDir A_WorkingDir
-;explorerpath:= "explorer /select," A_ScriptDir
-explorerpath := videoPath
-Run, %explorerpath%
+if (listMode = 1) {
+    downloadAndUpdate("", "")
+} else {
+    ; A_ScriptDir A_WorkingDir
+    ;explorerpath:= "explorer /select," A_ScriptDir
+    explorerpath := videoPath
+    Run, %explorerpath%
+}
 return
 
 UpdateList:
-UpdateFileList(1)
+if (listMode = 1) {
+    msgbox, %disableInTheScheduleMode%
+} else {
+    UpdateFileList(1)
+}
 return
 
 Settings:
@@ -365,93 +482,136 @@ OpenHistoryFile:
 return
 
 GoLoad:
-IfNotExist, %A_ScriptDir%\%video_provider%
-{
-	msgbox, %video_providerNotice%
-	return
-}
-Gui, Submit, NoHide
-params := ""
-lastparams := ""
-nodownload := 0
-if (CheckGetQualityList = 1) {
-	params := %params% . " -F"
-	nodownload := 1
-}
-if (nodownload = 0) {
-	if (CheckThumbnails = 1) {
-		params := params " --write-all-thumbnails"
-	}
-;Best 1||Show variants 2|3gp 176x144 3|webm 640x360 4|mp4 640x360 5|mp4 hd720 6|webm audio 1 7|webm audio 2 8|m4a audio 3 9|webm audio 4 10|webm audio 5 11 |webm 256x144 12|mp4 256x144 13|webm 1280x720 14|mp4 1280x720 15|webm 1920x1080 16|mp4 1920x1080 17
-	if (VideoFormat = 2) {
-		params := params " -F"
-		lastparams := %lastparams% . " > formats.txt"
-	}
-	if (VideoFormat = 3) {
-		params := params " -f 17"
-	}
-	if (VideoFormat = 4) {
-		params := params " -f 43"
-	}
-	if (VideoFormat = 5) {
-		params := params " -f 18"
-	}
-	if (VideoFormat = 6) {
-		params := params " -f 22"
-	}
-	if (VideoFormat = 7) {
-		params := params " -f 249"
-	}
-	if (VideoFormat = 9) {
-		params := params " -f 140"
-	}
-	if (VideoFormat = 11) {
-		params := params " -f 171"
-	}
-	if (VideoFormat = "15") {
-		params := params " -f 136"
-	}
-	if (VideoFormat = "16") {
-		params := params " -f 248"
-	}
-	if (VideoFormat = "17") {
-		params := params " -f 137"
-	}
-	if (VideoFormat != "1" && params = " --write-all-thumbnails") {
-		params := params " -f " VideoFormat
-	}
-}
-
-quotes = `"
-if (InStr(Path,"http")) {
-	params := params " " quotes Path quotes
-} else {
-	params := params " " quotes "http://www.youtube.com/watch?v=" Path quotes
-}
-
-fullPath := video_provider " " params " " specialParams
-
-RunWait %fullPath%
-
-if (VideoFormat = 2) {
-	FileRead, Contents, formats.txt
-	if not ErrorLevel {
-		msgbox, %Contents%
-	}
-}
-UpdateFileList()
-
-;Write to log
-FileAppend, % fullPath "`n", history.txt
+    Gui, Submit, NoHide
+    return
+    prepareLinkAndDownload(Path, VideoFormat, CheckThumbnails, CheckGetQualityList)
 Return
 
-ContextOpenFile:
-	MsgBox in develop
-return
+prepareLinkAndDownload(Path, VideoFormat, CheckThumbnails, CheckGetQualityList)
+{
+    global listMode
+    global video_provider
+    global video_providerNotice
 
-ContextMoveFileTo:
-	MsgBox in develop
-return
+    IfNotExist, %A_ScriptDir%\%video_provider%
+    {
+        msgbox, %video_providerNotice%
+        return
+    }
+    params := ""
+    lastparams := ""
+    nodownload := 0
+    if (CheckGetQualityList = 1) {
+        params := %params% . " -F"
+        nodownload := 1
+    }
+    if (nodownload = 0) {
+        if (CheckThumbnails = 1) {
+            params := params " --write-all-thumbnails"
+        }
+
+        if (VideoFormat = 2) {
+            params := params " -F"
+            lastparams := %lastparams% . " > formats.txt"
+        }
+        if (VideoFormat = 3) {
+            params := params " -f 17"
+        }
+        if (VideoFormat = 4) {
+            params := params " -f 43"
+        }
+        if (VideoFormat = 5) {
+            params := params " -f 18"
+        }
+        if (VideoFormat = 6) {
+            params := params " -f 22"
+        }
+        if (VideoFormat = 7) {
+            params := params " -f 249"
+        }
+        if (VideoFormat = 9) {
+            params := params " -f 140"
+        }
+        if (VideoFormat = 11) {
+            params := params " -f 171"
+        }
+        if (VideoFormat = "15") {
+            params := params " -f 136"
+        }
+        if (VideoFormat = "16") {
+            params := params " -f 248"
+        }
+        if (VideoFormat = "17") {
+            params := params " -f 137"
+        }
+        if (VideoFormat != "1" && params = " --write-all-thumbnails") {
+            params := params " -f " VideoFormat
+        }
+    }
+
+    quotes = `"
+    if (InStr(Path,"http")) {
+        params := params " " quotes Path quotes
+    } else {
+        params := params " " quotes "http://www.youtube.com/watch?v=" Path quotes
+    }
+
+    fullPath := video_provider " " params " " specialParams
+
+    if (listMode = 1) {
+        scheduled(fullPath, Path)
+    } else {
+        downloadAndUpdate(fullPath, Path)
+    }
+
+    if (VideoFormat = 2) {
+        sleep, 500
+        FileRead, Contents, formats.txt
+        if not ErrorLevel {
+            msgbox, %Contents%
+        }
+    } else {
+        if (listMode = false) {
+            UpdateFileList()
+        }
+    }
+}
+
+downloadAndUpdate(fullPath, Path)
+{
+    global listMode
+    if (fullPath != "") {
+        RunWait %fullPath%
+        FileAppend, % fullPath "`n", history.txt
+        FileAppend, % Path "`n", historyURL.txt
+        TrayTip, Download item, %Path%, 17
+     }
+    if (listMode = 1) {
+        Gui +LastFound
+        rowCount := LV_GetCount()
+        Loop %rowCount%
+        {
+            rowNumber := A_Index
+            LV_GetText(newPath, rowNumber, 2)
+            LV_GetText(newFullPath, rowNumber, 3)
+            LV_Delete(rowNumber)
+            SaveToIni("ScheduledTemp.ini")
+            downloadAndUpdate(newFullPath, newPath)
+            break
+        }
+        if (rowCount = 0) {
+            ScheduleMode()
+            FileDelete, %A_ScriptDir%\ScheduledTemp.ini
+            UpdateFileList()
+        }
+    }
+    return
+}
+
+scheduled(fullPath, Path)
+{
+    addnewrow(Path, fullPath)
+}
 
 SetLanguageTo:
 	IniWrite, %A_ThisMenuItem%, %settingsPath%, main , language
@@ -536,7 +696,7 @@ FileMoveTo:
 	    }
 	}
     ;filesForMoveCount := filesForMove.MaxIndex()
-    MsgBox %MessageMoved% %filesMovedCount% %MessageFilesAfterCount%
+    TrayTip, %MessageMoved%, %MessageMoved% %filesMovedCount% %MessageFilesAfterCount%, 17
 	UpdateFileList(1)
 return
 
@@ -608,16 +768,20 @@ GuiDropFiles:
 Return
 
 FromClipBoard:
-	GuiControl,, Path, %clipboard%
-	Goto, GoLoad
+    Gui, Submit, NoHide
+    if (listMode = 1) {
+        ;if (InStr(Path,"http"))
+        Loop, parse, clipboard, `n, `r
+        {
+            prepareLinkAndDownload(A_LoopField, VideoFormat, CheckThumbnails, CheckGetQualityList)
+            sleep, 100
+        }
+    } else {
+        GuiControl,, Path, %clipboard%
+        Gui, Submit, NoHide
+        prepareLinkAndDownload(Path, VideoFormat, CheckThumbnails, CheckGetQualityList)
+	}
 Return
-
-^+!0::
-	Gui, Show
-	Sleep, 400
-	GuiControl,, Path, %clipboard%
-	Goto, GoLoad
-return
 
 About:
 FileRead, readme, README.md
@@ -649,11 +813,13 @@ Return
 ; Update downloader - Done
 ; templates
 ; --config-location A_ScriptDir
-; history in the table
+; history in the table = history mode
 ; check before load by history (option)
 ; queue for myltyloads
 ; custom converts
 ; custom file work with some apps
+; view downloads folders items (update list)
+; add folder for download for eny item in the schedules
 ; =============== Changes
 ; v 2.5 check links and dload from other sites (not only youtube)
 ; v 2.7 = add reload to tray and add to list *.mp4, *.mkv, *.mka, *.webm, *.weba, *.mp3
@@ -661,3 +827,4 @@ Return
 ; v 3.0.34 move menu in "system submenu", add update douwloader func
 ; v 3.0.35 add formates (m4a), add image templates for move, some fix
 ; v 3.0.36 ctrl+shift+R hot key for reload
+; v 3.1.01 add schedules

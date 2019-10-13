@@ -17,6 +17,7 @@ https://github.com/ytdl-org/youtube-dl
 - translations
 - config file (save lang and custom param)
 - on Top option
+- schedule mode (CTRL+SHIFT+9)
 
 Show hidden window by CTRL+SHIFT+0
 Quick download from buffer CTRL+SHIFT+ALT+0
