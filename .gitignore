@@ -6,7 +6,9 @@
 *.dylib
 *.mkv
 *.mp4
+*.m4a
 *.webm
+*.webp
 *.description
 *.jpg
 *Temp.ini

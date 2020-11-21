@@ -4,7 +4,7 @@
 #Include, AutoXYWH.ahk
 
 SetBatchLines, -1
-version = "3.1.01"
+version = "3.1.03"
 ontop := false
 shortWin := false
 listMode := 0
@@ -20,6 +20,18 @@ language := "en"
 specialParams := ""
 imagesFolder := "images"
 downloadsDirName := "downloads"
+
+bitness := A_PtrSize*8
+libWebpPath := A_ScriptDir . "\libwebp" . bitness . ".dll"
+
+libwebp32Url := "https://s3.amazonaws.com/resizer-dynamic-downloads/webp/0.5.2/x86/libwebp.dll"
+libwebp64Url := "https://s3.amazonaws.com/resizer-dynamic-downloads/webp/0.5.2/x86_64/libwebp.dll"
+lib := A_ScriptDir . "\libwebp" . bitness . ".dll"
+if !FileExist(libWebpPath)
+   URLDownloadToFile, % libwebp%bitness%Url, % libWebpPath
+
+fileHeadPattenrs := {"webp": {"HEX": "57:45:42:50", "POS": 8, "SIZE": 4}}
+; info: https://developers.google.com/speed/webp/docs/riff_container#webp_file_header
 
 video_provider := "youtube-dl.exe"
 providerLinkForDownload := "http://46j.ru/files/youtube-dl.exe"
@@ -74,6 +86,23 @@ NOTexistFile(currentVal)
       return false
   }
   return true
+}
+
+checkFileFormat(filePath, format) {
+    global fileHeadPattenrs
+
+    oFile := FileOpen(filePath, "r")
+    oFile.Pos := fileHeadPattenrs[format]["POS"]
+    Loop, % fileHeadPattenrs[format]["SIZE"]
+    {
+        vNum := oFile.ReadUChar() ;reads data, advances pointer
+        vOutputHex .= (A_Index=1?"":":") Format("{:02X}", vNum)
+    }
+    if (vOutputHex = fileHeadPattenrs[format]["HEX"]) {
+        return true
+    } else {
+        return false
+    }
 }
 
 addnewrow(textvar2,textvar3,textcolor:="0x000000",bgcolor="0xFFFFFF")
@@ -147,28 +176,18 @@ AddMenu(menuType, menuName, menuSub, menuIcon, isSeparator = 0)
 	return
 }
 
-SplashImageGUI(Picture, X, Y, Duration, Transparent = false, width = 500)
+SplashImageGUI(Picture, X, Y, Duration, Transparent = false, width = 100)
 {
-    Gui, XPT99:Margin , 0, 0
-    Gui, XPT99:Add, Picture, w%width% h-1, %Picture%
-    Gui, XPT99:Color, ECE9D8
-    Gui, XPT99:+LastFound -Caption +AlwaysOnTop +ToolWindow -Border
-    If Transparent
-    {
-    Winset, TransColor, ECE9D8
+    global libWebpPath
+    ;TODO: use X, Y, W, H
+    if (checkFileFormat(Picture, "webp") = true) {
+        hBitmap := HBitmapFromWebP(libWebpPath, Picture, width, height)
+        SB_SetText("webp " . Picture)
+    } else {
+        hBitmap := LoadPicture(Picture)
+        SB_SetText("jpg " . Picture)
     }
-    Gui, XPT99:Show, x%X% y%Y% NoActivate
-    SetTimer, DestroySplashGUI, -%Duration%
-    return
-
-    DestroySplashGUI:
-    Gui, XPT99:Destroy
-    return
-}
-
-SplashImageGUIDestroy()
-{
-    Gui, XPT99:Destroy
+    GuiControl,, IMGV, HBITMAP:%hBitmap%
 }
 
 flagInvert(flag)
@@ -256,6 +275,66 @@ ScheduleMode() {
     UpdateStatusBar()
 }
 
+HBitmapFromWebP(libwebp, WebpFilePath, ByRef width, ByRef height) {
+   file := FileOpen(WebpFilePath, "r")
+   len := file.RawRead(buff, file.Length)
+   file.Close()
+   if !len
+      throw Exception("Failed to read the image file")
+   
+   if !hLib := DllCall("LoadLibrary", Str, libwebp, Ptr)
+      throw Exception("Failed to load library. Error:" . A_LastError)
+   
+   if !pBits := DllCall(libwebp . "\WebPDecodeRGBA", Ptr, &buff, Ptr, len, IntP, width, IntP, height) {
+      DllCall("FreeLibrary", Ptr, hLib)
+      throw Exception("Failed to decode the image file")
+   }
+   
+   oGDIp := new GDIp
+   pBitmap := oGDIp.CreateBitmapFromScan0(width, height, pBits)
+   hBitmap := oGDIp.CreateHBITMAPFromBitmap(pBitmap)
+   DllCall(libwebp . "\WebPFree", Ptr, pBits)
+   oGDIp.DisposeImage(pBitmap)
+   DllCall("FreeLibrary", Ptr, hLib)
+   Return hBitmap
+}
+
+class GDIp   {
+   __New() {
+      if !DllCall("GetModuleHandle", Str, "gdiplus", Ptr)
+         DllCall("LoadLibrary", Str, "gdiplus")
+      VarSetCapacity(si, A_PtrSize = 8 ? 24 : 16, 0), si := Chr(1)
+      DllCall("gdiplus\GdiplusStartup", UPtrP, pToken, Ptr, &si, Ptr, 0)
+      this.token := pToken
+   }
+   
+   __Delete()  {
+      DllCall("gdiplus\GdiplusShutdown", Ptr, this.token)
+      if hModule := DllCall("GetModuleHandle", Str, "gdiplus", Ptr)
+         DllCall("FreeLibrary", Ptr, hModule)
+   }
+   
+   CreateBitmapFromScan0(Width, Height, pBits, PixelFormat := 0x26200A, Stride := "") {
+      if !Stride {
+         bpp := (PixelFormat & 0xFF00) >> 8
+         Stride := ((Width * bpp + 31) & ~31) >> 3
+      }
+      DllCall("gdiplus\GdipCreateBitmapFromScan0", Int, Width, Int, Height
+                                                 , Int, Stride, Int, PixelFormat
+                                                 , Ptr, pBits, PtrP, pBitmap)
+      Return pBitmap
+   }
+   
+   CreateHBITMAPFromBitmap(pBitmap, Background=0xffffffff) {
+      DllCall("gdiplus\GdipCreateHBITMAPFromBitmap", Ptr, pBitmap, PtrP, hbm, Int, Background)
+      return hbm
+   }
+   
+   DisposeImage(pBitmap) {
+      return DllCall("gdiplus\GdipDisposeImage", Ptr, pBitmap)
+   }
+}
+
 
 IfExist, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico
 	Menu, Tray, Icon, %A_ScriptDir%\%imagesFolder%\youtube_dl.ico,, 0
@@ -276,11 +355,13 @@ MainWinTitle := getTranslatedString("MainWinTitle", "Video dloader (youtube and 
 Gui, Add, Edit, x6 y5 w320 h20 vPath,
 Gui, Add, Button, x336 y5 w70 gFromClipBoard vFromClipBoard, %BufferMsg%
 Gui, Add, Checkbox, Checked x6 y46 vCheckThumbnails , %showImagesMsg%
-Gui, Add, ComboBox, x70 y40 vVideoFormat AltSubmit ,Best||View variants|3gp 176x144|webm 640x360|mp4 640x360|mp4 hd720|webm audio 1|webm audio 2|m4a audio 3|webm audio 4|webm audio 5|webm 256x144|mp4 256x144|webm 1280x720|mp4 1280x720|webm 1920x1080|mp4 1920x1080
+Gui, Add, ComboBox, x70 y40 vVideoFormat AltSubmit ,Best||View variants|3gp 176x144|webm 640x360|mp4 640x360|mp4 hd720|webm audio 1|webm audio 2|m4a audio 3|webm audio 4|webm audio 5|webm 256x144|mp4 256x144|webm 1280x720|mp4 1280x720|webm 1920x1080|mp4 1920x1080|bestmp4
 Gui, Add, Button, x195 y40 w60 gGoFolder vGoFolder, %folderMsg%
 Gui, Add, Button, x265 y40 w60 gGoLoad vGoLoad, %DloadMsg%
 Gui, Add, Button, x335 y40 w70 vSettingsButton gSettings, %SettingsMsg%
-Gui, Add, ListView, x6 r25 w400 +Grid vTLV AltSubmit gResultTable, №  |%ListViewColFileSize% |%ListViewColName%
+Gui, Add, ListView, x6 r20 w400 +Grid vTLV AltSubmit gResultTable, №  |%ListViewColFileSize% |%ListViewColName%
+Gui, Add, Picture, w100 h-1 vIMGV,
+
 Gui, Add, StatusBar, vStatusBar,
 Gui, Font, s22 cFFFFFF Bold, Verdana ; If desired, use a line like this to set a new default font for the window.
 GuiControl, Font, TextArea
@@ -358,7 +439,7 @@ return
 GuiSize:
 	If (A_EventInfo = 1) ; The window has been minimized.
 		Return
-	AutoXYWH("wh", "TLV")
+    AutoXYWH("wh", "TLV")
 	AutoXYWH("w", "Path")
 	AutoXYWH("w", "VideoFormat")
 
@@ -544,6 +625,9 @@ prepareLinkAndDownload(Path, VideoFormat, CheckThumbnails, CheckGetQualityList)
         if (VideoFormat = "17") {
             params := params " -f 137"
         }
+        if (VideoFormat = "18") {
+            params := params " -f bestvideo[ext=mp4]+bestaudio[ext=m4a]"
+        }
         if (VideoFormat != "1" && params = " --write-all-thumbnails") {
             params := params " -f " VideoFormat
         }
@@ -581,7 +665,7 @@ downloadAndUpdate(fullPath, Path)
 {
     global listMode
     if (fullPath != "") {
-        RunWait %fullPath%
+        RunWait %fullPath%,,Hide
         FileAppend, % fullPath "`n", history.txt
         FileAppend, % Path "`n", historyURL.txt
         TrayTip, Download item, %Path%, 17
@@ -649,6 +733,26 @@ FileMoveTo:
 	    {
 	    	FileMove, %A_ScriptDir%\%OutNameNoExt%.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
 	    }
+        IfExist, %A_ScriptDir%\%OutNameNoExt%_0.jpg
+        {
+            FileMove, %A_ScriptDir%\%OutNameNoExt%_0.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+        }
+        IfExist, %A_ScriptDir%\%OutNameNoExt%_1.jpg
+        {
+            FileMove, %A_ScriptDir%\%OutNameNoExt%_1.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+        }
+        IfExist, %A_ScriptDir%\%OutNameNoExt%_2.jpg
+        {
+            FileMove, %A_ScriptDir%\%OutNameNoExt%_2.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+        }
+        IfExist, %A_ScriptDir%\%OutNameNoExt%_3.jpg
+        {
+            FileMove, %A_ScriptDir%\%OutNameNoExt%_3.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+        }
+        IfExist, %A_ScriptDir%\%OutNameNoExt%_4.jpg
+        {
+            FileMove, %A_ScriptDir%\%OutNameNoExt%_4.jpg, %A_ScriptDir%\%downloadsDirName%\%A_ThisMenuItem%\ , 0
+        }
 
 
 	    IfExist, %A_ScriptDir%\%OutNameNoExt%_640.jpg
@@ -747,12 +851,22 @@ ResultTable:
 	     {
 	     	image=%A_ScriptDir%\%OutNameNoExt%_640.jpg
 	     }
-	     IfExist, %A_ScriptDir%\%OutNameNoExt%_medium.jpg
-	     {
-	     	image=%A_ScriptDir%\%OutNameNoExt%_medium.jpg
-	     }
+         IfExist, %A_ScriptDir%\%OutNameNoExt%_medium.jpg
+         {
+            image=%A_ScriptDir%\%OutNameNoExt%_medium.jpg
+         }
+         IfExist, %A_ScriptDir%\%OutNameNoExt%_0.jpg
+         {
+            image=%A_ScriptDir%\%OutNameNoExt%_0.jpg
+         }
+         IfExist, %A_ScriptDir%\%OutNameNoExt%_4.jpg
+         {
+            image=%A_ScriptDir%\%OutNameNoExt%_4.jpg
+         }
+
+        ;msgbox, %A_ScriptDir%\%OutNameNoExt%`n%image%
+
          if (image != "") {
-             SplashImageGUIDestroy()
              SplashImageGUI(image, "Center", "Center", 1500, true)
          }
          image := ""
@@ -810,6 +924,7 @@ Return
 ;--write-annotations
 
 ; =============== Features
+; CHECKER - hide or not yt-dl win AND show with pause (new bat file)
 ; Update downloader - Done
 ; templates
 ; --config-location A_ScriptDir
@@ -820,6 +935,12 @@ Return
 ; custom file work with some apps
 ; view downloads folders items (update list)
 ; add folder for download for eny item in the schedules
+; SHOW "NOW DOWNLOAD..."
+; MULTYLOADER
+; SHOW TITLE ON LOAD PROCESS
+; MORE PARAMS
+; -o "/home/user/videos/%(title)s-%(id)s.%(ext)s"
+; https://github.com/ytdl-org/youtube-dl/blob/master/README.md#options
 ; =============== Changes
 ; v 2.5 check links and dload from other sites (not only youtube)
 ; v 2.7 = add reload to tray and add to list *.mp4, *.mkv, *.mka, *.webm, *.weba, *.mp3
@@ -828,3 +949,4 @@ Return
 ; v 3.0.35 add formates (m4a), add image templates for move, some fix
 ; v 3.0.36 ctrl+shift+R hot key for reload
 ; v 3.1.01 add schedules
+; v 3.1.01 3.1.03 add support for webp images and set preview to win (remove splashimage)
